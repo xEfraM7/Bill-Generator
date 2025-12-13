@@ -1,10 +1,13 @@
-export const useDate = () => {
+// Función para obtener la fecha formateada al momento de llamarla
+export const getFormattedDate = (): string => {
   const today = new Date();
   const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0"); // Los meses en JS son de 0 a 11
+  const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
+  return `${day}/${month}/${year}`;
+};
 
-  const formattedDate = `${day}/${month}/${year}`;
-
-  return { formattedDate };
+// Hook mantenido por compatibilidad, pero usa la función directamente en submit
+export const useDate = () => {
+  return { formattedDate: getFormattedDate(), getFormattedDate };
 };

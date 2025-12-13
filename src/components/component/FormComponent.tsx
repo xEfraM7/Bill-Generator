@@ -8,64 +8,27 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
 import { FormField } from "./FormField";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { formDynamicsReceiver } from "@/json/formJson";
 import { FormArticleComponent } from "./FormArticleComponent";
-import { useState } from "react";
-import { Invoice, InVoicePDF } from "../pdf/InVoicePDF";
+import { useState, useMemo } from "react";
+import { InVoicePDF } from "../pdf/InVoicePDF";
 import useArticles from "@/hooks/useArticles";
-import { useDate } from "@/hooks/useDate";
+import { getFormattedDate } from "@/hooks/useDate";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { DataForm } from "@/types/FormTypes";
+import { DataForm, Invoice, formValidationSchema } from "@/types/FormTypes";
+import { senderDefaults } from "@/config/senderDefaults";
 import saveAs from "file-saver";
 import { pdf, PDFViewer } from "@react-pdf/renderer";
 
 export const FormComponent = () => {
-  const [screenDisplay, setScreenDisplay] = useState<Boolean>(false);
-  const { formattedDate } = useDate();
-
-  // const formValidation = z.object({
-  //   nameSender: z.string(),
-  //   emailSender: z.string().email("Debe ser un correo."),
-  //   jobSender: z.string(),
-  //   streetSender: z.string(),
-  //   stateSender: z.string(),
-  //   citySender: z.string(),
-  //   countrySender: z.string(),
-  //   nameReceiver: z.string(),
-  //   emailReceiver: z.string(),
-  //   streetReceiver: z.string(),
-  //   stateReceiver: z.string(),
-  //   cityReceiver: z.string(),
-  //   countryReceiver: z.string(),
-  //   serviceDescription: z.string(),
-  //   totalAmount: z.number(),
-  //   date: z.string().date(),
-  //   // inVoiceNumber: generateRandomNumber(8),
-  // });
-
-  const [formState, setformState] = useState<Invoice>({
-    nameSender: "",
-    emailSender: "",
-    jobSender: "",
-    streetSender: "",
-    stateSender: "",
-    citySender: "",
-    countrySender: "",
-    nameReceiver: "",
-    emailReceiver: "",
-    streetReceiver: "",
-    stateReceiver: "",
-    cityReceiver: "",
-    countryReceiver: "",
-    serviceDescription: "",
-    articles: [],
-    totalAmount: 0,
-    date: "",
-    inVoiceNumber: "",
-  });
+  const [screenDisplay, setScreenDisplay] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [formState, setFormState] = useState<Invoice | null>(null);
+  const [activeSection, setActiveSection] = useState<number>(0);
 
   const {
     handleSubmit,
@@ -73,16 +36,11 @@ export const FormComponent = () => {
     register,
     setValue,
     watch,
-    // formState: { errors },
-  } = useForm<any>({
+    trigger,
+    formState: { errors },
+  } = useForm<DataForm>({
     defaultValues: {
-      nameSender: "Efren Cabrera",
-      emailSender: "efrecabrera64@gmail.com",
-      jobSender: "Electricista",
-      streetSender: "Urb. Desarrollo camburito",
-      stateSender: "Portuguesa",
-      citySender: "Araure",
-      countrySender: "Venezuela",
+      ...senderDefaults,
       nameReceiver: "",
       emailReceiver: "",
       streetReceiver: "",
@@ -92,11 +50,22 @@ export const FormComponent = () => {
       serviceDescription: "",
       articles: [],
     },
-    // resolver: zodResolver(formValidation),
+    resolver: zodResolver(formValidationSchema),
   });
 
-  const handleReload = () => {
-    location.reload();
+  const articles = watch("articles");
+
+  const currentTotal = useMemo(() => {
+    return articles.reduce((acc, article) => {
+      const price = parseFloat(article.price) || 0;
+      const quantity = parseFloat(article.quantity) || 0;
+      return acc + price * quantity;
+    }, 0);
+  }, [articles]);
+
+  const handleBack = () => {
+    setScreenDisplay(false);
+    setFormState(null);
   };
 
   const { handleChangeArticle, handleRemoveArticle } = useArticles(
@@ -104,118 +73,402 @@ export const FormComponent = () => {
     setValue
   );
 
-  const saveFile = (filename: string, state: Invoice) => {
-    pdf(<InVoicePDF {...state} />)
-      .toBlob()
-      .then((blob) => saveAs(blob, `${filename}.pdf`));
+  const generateRandomNumber = (length: number) => {
+    const randomNumber = Math.floor(Math.random() * Math.pow(10, length));
+    return String(randomNumber).padStart(length, "0");
   };
 
-  const onSubmit = (data: Invoice) => {
-    const elementArray: number[] = [];
+  const saveFile = async (filename: string, invoiceData: Invoice) => {
+    const blob = await pdf(<InVoicePDF {...invoiceData} />).toBlob();
+    saveAs(blob, `${filename}.pdf`);
+  };
 
-    const arrayArticles = (data: Invoice) => {
-      for (let index = 0; index < data.articles.length; index++) {
-        let productPrice = Number(data.articles[index].price);
-        let productQuantity = Number(data.articles[index].quantity);
-        let totalAmount = productPrice * productQuantity;
-        elementArray.push(totalAmount);
-      }
+  const onSubmit = async (data: DataForm) => {
+    setIsLoading(true);
+
+    try {
+      const totalAmount = data.articles.reduce((acc, article) => {
+        const price = parseFloat(article.price) || 0;
+        const quantity = parseFloat(article.quantity) || 0;
+        return acc + price * quantity;
+      }, 0);
+
+      const invoiceNumber = generateRandomNumber(8);
+      const invoiceData: Invoice = {
+        ...data,
+        totalAmount,
+        date: getFormattedDate(),
+        inVoiceNumber: invoiceNumber,
+      };
+
+      setFormState(invoiceData);
+      await saveFile(invoiceNumber, invoiceData);
+      setScreenDisplay(true);
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sections = [
+    { id: 0, title: "Empresa", icon: "🏢" },
+    { id: 1, title: "Receptor", icon: "👤" },
+    { id: 2, title: "Servicio", icon: "📝" },
+    { id: 3, title: "Artículos", icon: "📦" },
+  ];
+
+  const validateSection = async (sectionId: number): Promise<boolean> => {
+    const fieldsToValidate: Record<number, (keyof DataForm)[]> = {
+      0: ["companyName"],
+      1: [
+        "nameReceiver",
+        "emailReceiver",
+        "streetReceiver",
+        "stateReceiver",
+        "cityReceiver",
+        "countryReceiver",
+      ],
+      2: ["serviceDescription"],
+      3: ["articles"],
     };
+    return await trigger(fieldsToValidate[sectionId]);
+  };
 
-    arrayArticles(data);
+  const handleNextSection = async () => {
+    const isValid = await validateSection(activeSection);
+    if (isValid && activeSection < sections.length - 1) {
+      setActiveSection(activeSection + 1);
+    }
+  };
 
-    const totalAmountInvoice = elementArray.reduce(
-      (accumulator, currentValue) => {
-        return accumulator + currentValue;
-      },
-      0
+  const handlePrevSection = () => {
+    if (activeSection > 0) {
+      setActiveSection(activeSection - 1);
+    }
+  };
+
+  if (screenDisplay && formState) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        {/* Desktop PDF Viewer */}
+        <PDFViewer className="h-screen w-full hidden lg:flex">
+          <InVoicePDF {...formState} />
+        </PDFViewer>
+
+        {/* Mobile Success Screen */}
+        <div className="lg:hidden flex flex-col items-center justify-center min-h-screen gap-6 p-6">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+            <svg
+              className="w-10 h-10 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">
+              ¡Nota generada!
+            </h2>
+            <p className="text-slate-600">
+              El PDF ha sido descargado a tu dispositivo.
+            </p>
+            <p className="text-sm text-slate-500 mt-2">
+              N° {formState.inVoiceNumber}
+            </p>
+          </div>
+          <div className="w-full max-w-sm space-y-3">
+            <Button
+              onClick={handleBack}
+              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700"
+            >
+              Crear otra nota
+            </Button>
+            <Button
+              onClick={() => saveFile(formState.inVoiceNumber, formState)}
+              variant="outline"
+              className="w-full h-12"
+            >
+              Descargar de nuevo
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop Back Button */}
+        <Button
+          onClick={handleBack}
+          className="absolute top-4 left-4 hidden lg:flex"
+          variant="outline"
+        >
+          ← Volver al formulario
+        </Button>
+      </div>
     );
-
-    const generateRandomNumber = (length: number) => {
-      const randomNumber = Math.floor(Math.random() * Math.pow(10, length));
-      return String(randomNumber).padStart(length, "0");
-    };
-
-    const random8DigitNumber = generateRandomNumber(8);
-
-    setScreenDisplay(true);
-    setformState({
-      ...data,
-      totalAmount: totalAmountInvoice,
-      date: formattedDate,
-      inVoiceNumber: random8DigitNumber,
-    });
-    saveFile(formState.inVoiceNumber, {
-      ...data,
-      totalAmount: totalAmountInvoice,
-      date: formattedDate,
-      inVoiceNumber: random8DigitNumber,
-    });
-  };
+  }
 
   return (
-    <>
-      {!screenDisplay ? (
-        <div className="flex justify-center">
-          <Card className="max-w-6xl w-full">
-            <CardHeader>
-              <CardTitle className="text-2xl">Crear nota de entrega</CardTitle>
-              <CardDescription>
-                Llena el siguiente formulario debajo para seguir.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-                {/* DATOS DEL RECEPTOR */}
-                <CardTitle className="text-xl">Datos del receptor</CardTitle>
-                <div className="grid grid-cols-1 gap-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-4 px-3 sm:py-8 sm:px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">
+            Nota de Entrega
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm sm:text-base">
+            Genera tu documento en segundos
+          </p>
+        </div>
+
+        {/* Progress Steps - Mobile */}
+        <div className="flex justify-between mb-6 px-2">
+          {sections.map((section, index) => (
+            <button
+              key={section.id}
+              onClick={() => setActiveSection(index)}
+              className={`flex flex-col items-center transition-all ${
+                index === activeSection
+                  ? "scale-110"
+                  : index < activeSection
+                  ? "opacity-70"
+                  : "opacity-40"
+              }`}
+            >
+              <div
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-lg sm:text-xl mb-1 transition-colors ${
+                  index === activeSection
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : index < activeSection
+                    ? "bg-green-500 text-white"
+                    : "bg-slate-200 text-slate-500"
+                }`}
+              >
+                {index < activeSection ? "✓" : section.icon}
+              </div>
+              <span
+                className={`text-xs font-medium ${
+                  index === activeSection ? "text-blue-600" : "text-slate-500"
+                }`}
+              >
+                {section.title}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="h-1 bg-slate-200 rounded-full mb-6 mx-2">
+          <div
+            className="h-full bg-blue-600 rounded-full transition-all duration-300"
+            style={{
+              width: `${((activeSection + 1) / sections.length) * 100}%`,
+            }}
+          />
+        </div>
+
+        <Card className="shadow-xl border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl flex items-center gap-2">
+              <span className="text-2xl">{sections[activeSection].icon}</span>
+              {sections[activeSection].title}
+            </CardTitle>
+            <CardDescription>
+              {activeSection === 0 && "Nombre que aparecerá en el documento"}
+              {activeSection === 1 && "Datos de quien recibe la entrega"}
+              {activeSection === 2 && "Describe el servicio prestado"}
+              {activeSection === 3 && "Agrega los artículos entregados"}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)}>
+              {/* Section 0: Company Name */}
+              {activeSection === 0 && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companyName" className="text-base">
+                      Nombre de la empresa
+                    </Label>
+                    <Controller
+                      name="companyName"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="companyName"
+                          placeholder="Mi Empresa S.A."
+                          className="h-14 text-lg"
+                        />
+                      )}
+                    />
+                    {errors.companyName && (
+                      <span className="text-red-500 text-sm">
+                        {errors.companyName.message}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+                    💡 Este nombre aparecerá como título principal en tu nota de
+                    entrega.
+                  </p>
+                </div>
+              )}
+
+              {/* Section 1: Receiver Data */}
+              {activeSection === 1 && (
+                <div className="space-y-4">
                   {formDynamicsReceiver.map((field, index) => (
                     <div key={index}>
-                      <FormField {...field} control={control} />
+                      <FormField
+                        {...field}
+                        control={control}
+                        error={errors[field.name as keyof DataForm] as any}
+                      />
                     </div>
                   ))}
                 </div>
+              )}
 
-                {/* DESCRIPCION */}
-                <CardTitle className="text-xl">
-                  Descripcion del servicio
-                </CardTitle>
-                <div className="space-y-2">
-                  <Textarea
-                    id="serviceDescription"
-                    placeholder="Nuestro servicio de entrega rápida y segura garantiza que sus paquetes 
-                    lleguen a su destino de manera eficiente y puntual. 
-                    Ofrecemos soluciones personalizadas para envíos locales y nacionales, adaptándonos a sus necesidades específicas."
-                    {...register("serviceDescription", {})}
+              {/* Section 2: Service Description */}
+              {activeSection === 2 && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="serviceDescription" className="text-base">
+                      Descripción del servicio
+                    </Label>
+                    <Textarea
+                      id="serviceDescription"
+                      placeholder="Describe el servicio prestado o los detalles de la entrega..."
+                      className="min-h-[150px] text-base"
+                      {...register("serviceDescription")}
+                    />
+                    {errors.serviceDescription && (
+                      <span className="text-red-500 text-sm">
+                        {errors.serviceDescription.message}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Section 3: Articles */}
+              {activeSection === 3 && (
+                <div className="space-y-4">
+                  <FormArticleComponent
+                    handleChangeArticle={handleChangeArticle}
+                    handleRemoveArticle={handleRemoveArticle}
+                    articles={articles}
+                    control={control}
                   />
+                  {errors.articles && (
+                    <span className="text-red-500 text-sm block mt-2">
+                      {errors.articles.message}
+                    </span>
+                  )}
+
+                  {/* Total Display */}
+                  {articles.length > 0 && (
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-xl mt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-100">Total estimado</span>
+                        <span className="text-2xl font-bold">
+                          ${currentTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {/* Artículos */}
-                <CardTitle className="text-xl">Artículos</CardTitle>
-                <FormArticleComponent
-                  handleChangeArticle={handleChangeArticle}
-                  handleRemoveArticle={handleRemoveArticle}
-                  articles={watch().articles}
-                  control={control}
-                />
-
-                <div className="mt-8">
-                  <Button type="submit" className="w-full">
-                    Enviar
+              {/* Navigation Buttons */}
+              <div className="flex gap-3 mt-8">
+                {activeSection > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePrevSection}
+                    className="flex-1 h-14"
+                  >
+                    ← Anterior
                   </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <>
-          <PDFViewer className="h-screen w-full hidden lg:flex">
-            <InVoicePDF {...formState} />
-          </PDFViewer>
-          <Button onClick={handleReload} className="absolute top-0 left-0 bottom-0 right-0 m-auto w-1/2 lg:hidden">Recargar pagina!</Button>
-        </>
-      )}
-    </>
+                )}
+
+                {activeSection < sections.length - 1 ? (
+                  <Button
+                    type="button"
+                    onClick={handleNextSection}
+                    className="flex-1 h-14 bg-blue-600 hover:bg-blue-700"
+                  >
+                    Siguiente →
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="flex-1 h-14 bg-green-600 hover:bg-green-700"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
+                        </svg>
+                        Generando...
+                      </span>
+                    ) : (
+                      "Generar PDF 📄"
+                    )}
+                  </Button>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Quick Summary - Mobile */}
+        {articles.length > 0 && activeSection !== 3 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 lg:hidden">
+            <div className="flex justify-between items-center max-w-2xl mx-auto">
+              <div>
+                <p className="text-sm text-slate-500">
+                  {articles.length} artículo{articles.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-lg font-bold text-slate-800">
+                  ${currentTotal.toFixed(2)}
+                </p>
+              </div>
+              <Button
+                onClick={() => setActiveSection(3)}
+                variant="outline"
+                size="sm"
+              >
+                Ver artículos
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
