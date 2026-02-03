@@ -2,6 +2,7 @@ import { FormFieldProps } from "@/types/FormTypes";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Controller } from "react-hook-form";
+import { DocumentInput } from "./DocumentInput";
 
 export const FormField = ({
   type,
@@ -19,19 +20,31 @@ export const FormField = ({
       <Controller
         name={name}
         control={control}
-        render={({ field }) => (
-          <Input
-            {...field}
-            id={name}
-            type={type}
-            placeholder={placeholder}
-            className={`h-12 text-base ${
-              error
+        render={({ field }) =>
+          type === "document-id" ? (
+            <DocumentInput
+              id={name}
+              value={field.value}
+              onChange={field.onChange}
+              placeholder={placeholder}
+              className={` ${error
                 ? "border-red-500 focus:ring-red-500"
                 : "focus:ring-blue-500"
-            }`}
-          />
-        )}
+                }`}
+            />
+          ) : (
+            <Input
+              {...field}
+              id={name}
+              type={type}
+              placeholder={placeholder}
+              className={`h-12 text-base ${error
+                ? "border-red-500 focus:ring-red-500"
+                : "focus:ring-blue-500"
+                }`}
+            />
+          )
+        }
       />
       {error && (
         <span className="text-red-500 text-sm flex items-center gap-1">

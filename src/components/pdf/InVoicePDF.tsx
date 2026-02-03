@@ -1,5 +1,5 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { Invoice } from "@/types/FormTypes";
 
 export type { Invoice } from "@/types/FormTypes";
@@ -30,12 +30,28 @@ const styles = StyleSheet.create({
   },
   companySection: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    marginRight: 12,
+    objectFit: "contain",
+  },
+  companyInfo: {
+    flex: 1,
   },
   companyName: {
     fontSize: 24,
     fontWeight: "bold",
     color: colors.primary,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  companyId: {
+    fontSize: 10,
+    color: colors.secondary,
+    marginBottom: 8,
   },
   documentTitle: {
     fontSize: 12,
@@ -221,8 +237,15 @@ export const InVoicePDF = (invoice: Invoice) => (
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companySection}>
-          <Text style={styles.companyName}>{invoice.companyName}</Text>
-          <Text style={styles.documentTitle}>Nota de Entrega</Text>
+          {invoice.logo && (
+            // @ts-expect-error - alt is for accessibility linting but not used by react-pdf
+            <Image style={styles.logo} src={invoice.logo} alt="Logo" />
+          )}
+          <View style={styles.companyInfo}>
+            <Text style={styles.companyName}>{invoice.companyName}</Text>
+            <Text style={styles.companyId}>RIF: {invoice.companyId}</Text>
+            <Text style={styles.documentTitle}>Nota de Entrega</Text>
+          </View>
         </View>
         <View style={styles.invoiceInfo}>
           <Text style={styles.invoiceNumber}>N° {invoice.inVoiceNumber}</Text>
@@ -240,6 +263,11 @@ export const InVoicePDF = (invoice: Invoice) => (
             <Text style={styles.infoValueBold}>{invoice.nameReceiver}</Text>
           </View>
 
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Cedula / RIF:</Text>
+            <Text style={styles.infoValue}>{invoice.receiverId}</Text>
+          </View>
+
           {invoice.emailReceiver && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email:</Text>
@@ -247,25 +275,33 @@ export const InVoicePDF = (invoice: Invoice) => (
             </View>
           )}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Dirección:</Text>
-            <Text style={styles.infoValue}>{invoice.streetReceiver}</Text>
-          </View>
+          {invoice.streetReceiver && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Dirección:</Text>
+              <Text style={styles.infoValue}>{invoice.streetReceiver}</Text>
+            </View>
+          )}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Ciudad:</Text>
-            <Text style={styles.infoValue}>{invoice.cityReceiver}</Text>
-          </View>
+          {invoice.cityReceiver && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Ciudad:</Text>
+              <Text style={styles.infoValue}>{invoice.cityReceiver}</Text>
+            </View>
+          )}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Estado:</Text>
-            <Text style={styles.infoValue}>{invoice.stateReceiver}</Text>
-          </View>
+          {invoice.stateReceiver && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Estado:</Text>
+              <Text style={styles.infoValue}>{invoice.stateReceiver}</Text>
+            </View>
+          )}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>País:</Text>
-            <Text style={styles.infoValue}>{invoice.countryReceiver}</Text>
-          </View>
+          {invoice.countryReceiver && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>País:</Text>
+              <Text style={styles.infoValue}>{invoice.countryReceiver}</Text>
+            </View>
+          )}
         </View>
       </View>
 

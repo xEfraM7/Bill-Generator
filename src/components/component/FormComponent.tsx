@@ -11,24 +11,41 @@ import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { FormField } from "./FormField";
+import { ClientSelector } from "./ClientSelector";
+import { DocumentInput } from "./DocumentInput";
+import { LogoUploader } from "./LogoUploader";
+import { ShareButton } from "./ShareButton";
 import { useForm, Controller } from "react-hook-form";
 import { formDynamicsReceiver } from "@/json/formJson";
 import { FormArticleComponent } from "./FormArticleComponent";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { InVoicePDF } from "../pdf/InVoicePDF";
 import useArticles from "@/hooks/useArticles";
+import useSavedClients from "@/hooks/useSavedClients";
+import useSavedCompany from "@/hooks/useSavedCompany";
+import useLogo from "@/hooks/useLogo";
+import useInvoiceHistory from "@/hooks/useInvoiceHistory";
 import { getFormattedDate } from "@/hooks/useDate";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { DataForm, Invoice, formValidationSchema } from "@/types/FormTypes";
+import { DataForm, Invoice, formValidationSchema, SavedClient } from "@/types/FormTypes";
 import { senderDefaults } from "@/config/senderDefaults";
 import saveAs from "file-saver";
 import { pdf, PDFViewer } from "@react-pdf/renderer";
+import { toast } from "sonner";
 
 export const FormComponent = () => {
   const [screenDisplay, setScreenDisplay] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [formState, setFormState] = useState<Invoice | null>(null);
   const [activeSection, setActiveSection] = useState<number>(0);
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
+
+  // Hooks de persistencia
+  const { clients, saveClient, deleteClient, isLoaded: clientsLoaded } = useSavedClients();
+  const { company, saveCompany, isLoaded: companyLoaded } = useSavedCompany();
+  const { logo } = useLogo();
+  const { addToHistory } = useInvoiceHistory();
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
   const {
     handleSubmit,
@@ -41,7 +58,9 @@ export const FormComponent = () => {
   } = useForm<DataForm>({
     defaultValues: {
       ...senderDefaults,
+      companyId: "",
       nameReceiver: "",
+      receiverId: "",
       emailReceiver: "",
       streetReceiver: "",
       stateReceiver: "",
@@ -73,6 +92,53 @@ export const FormComponent = () => {
     setValue
   );
 
+  // Cargar datos de empresa guardados
+  useEffect(() => {
+    if (companyLoaded && company) {
+      setValue("companyName", company.name);
+      setValue("companyId", company.id);
+    }
+  }, [companyLoaded, company, setValue]);
+
+  // Manejar selección de cliente guardado
+  const handleSelectClient = (client: SavedClient) => {
+    setSelectedClientId(client.id);
+    setValue("nameReceiver", client.name);
+    setValue("receiverId", client.receiverId);
+    setValue("emailReceiver", client.email || "");
+    setValue("streetReceiver", client.street || "");
+    setValue("cityReceiver", client.city || "");
+    setValue("stateReceiver", client.state || "");
+    setValue("countryReceiver", client.country || "");
+  };
+
+  // Guardar cliente actual
+  const handleSaveCurrentClient = () => {
+    const name = watch("nameReceiver");
+    const receiverId = watch("receiverId");
+    if (name && receiverId) {
+      saveClient({
+        name,
+        receiverId,
+        email: watch("emailReceiver"),
+        street: watch("streetReceiver"),
+        city: watch("cityReceiver"),
+        state: watch("stateReceiver"),
+        country: watch("countryReceiver"),
+      });
+      setSelectedClientId(undefined);
+    }
+  };
+
+  // Guardar datos de empresa
+  const handleSaveCompany = () => {
+    const name = watch("companyName");
+    const id = watch("companyId");
+    if (name && id) {
+      saveCompany({ name, id });
+    }
+  };
+
   const generateRandomNumber = (length: number) => {
     const randomNumber = Math.floor(Math.random() * Math.pow(10, length));
     return String(randomNumber).padStart(length, "0");
@@ -99,13 +165,23 @@ export const FormComponent = () => {
         totalAmount,
         date: getFormattedDate(),
         inVoiceNumber: invoiceNumber,
+        logo: logo || undefined, // Add logo if exists
       };
 
+      // Generate PDF blob for sharing
+      const blob = await pdf(<InVoicePDF {...invoiceData} />).toBlob();
+      setPdfBlob(blob);
+
+      // Save to history
+      addToHistory(invoiceData);
+
       setFormState(invoiceData);
-      await saveFile(invoiceNumber, invoiceData);
+      saveAs(blob, `${invoiceNumber}.pdf`);
       setScreenDisplay(true);
+      toast.success("¡Nota de entrega generada!");
     } catch (error) {
       console.error("Error generando PDF:", error);
+      toast.error("Error al generar el PDF");
     } finally {
       setIsLoading(false);
     }
@@ -120,9 +196,10 @@ export const FormComponent = () => {
 
   const validateSection = async (sectionId: number): Promise<boolean> => {
     const fieldsToValidate: Record<number, (keyof DataForm)[]> = {
-      0: ["companyName"],
+      0: ["companyName", "companyId"],
       1: [
         "nameReceiver",
+        "receiverId",
         "emailReceiver",
         "streetReceiver",
         "stateReceiver",
@@ -191,13 +268,20 @@ export const FormComponent = () => {
             >
               Crear otra nota
             </Button>
-            <Button
-              onClick={() => saveFile(formState.inVoiceNumber, formState)}
-              variant="outline"
-              className="w-full h-12"
-            >
-              Descargar de nuevo
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => saveFile(formState.inVoiceNumber, formState)}
+                variant="outline"
+                className="flex-1 h-12"
+              >
+                📥 Descargar
+              </Button>
+              <ShareButton
+                pdfBlob={pdfBlob}
+                fileName={`${formState.inVoiceNumber}.pdf`}
+                title={`Nota de Entrega #${formState.inVoiceNumber}`}
+              />
+            </div>
           </div>
         </div>
 
@@ -232,29 +316,26 @@ export const FormComponent = () => {
             <button
               key={section.id}
               onClick={() => setActiveSection(index)}
-              className={`flex flex-col items-center transition-all ${
-                index === activeSection
-                  ? "scale-110"
-                  : index < activeSection
+              className={`flex flex-col items-center transition-all ${index === activeSection
+                ? "scale-110"
+                : index < activeSection
                   ? "opacity-70"
                   : "opacity-40"
-              }`}
+                }`}
             >
               <div
-                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-lg sm:text-xl mb-1 transition-colors ${
-                  index === activeSection
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : index < activeSection
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-lg sm:text-xl mb-1 transition-colors ${index === activeSection
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : index < activeSection
                     ? "bg-green-500 text-white"
                     : "bg-slate-200 text-slate-500"
-                }`}
+                  }`}
               >
                 {index < activeSection ? "✓" : section.icon}
               </div>
               <span
-                className={`text-xs font-medium ${
-                  index === activeSection ? "text-blue-600" : "text-slate-500"
-                }`}
+                className={`text-xs font-medium ${index === activeSection ? "text-blue-600" : "text-slate-500"
+                  }`}
               >
                 {section.title}
               </span>
@@ -313,16 +394,70 @@ export const FormComponent = () => {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
-                    💡 Este nombre aparecerá como título principal en tu nota de
-                    entrega.
-                  </p>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyId" className="text-base">
+                      Cédula / RIF de la empresa
+                    </Label>
+                    <Controller
+                      name="companyId"
+                      control={control}
+                      render={({ field }) => (
+                        <DocumentInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          id="companyId"
+                          placeholder="12345678"
+                          className=""
+                        />
+                      )}
+                    />
+                    {errors.companyId && (
+                      <span className="text-red-500 text-sm">
+                        {errors.companyId.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                    <p className="text-sm text-slate-500">
+                      💡 Este nombre aparecerá como título principal en tu nota de
+                      entrega.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSaveCompany}
+                      className="ml-2 shrink-0"
+                    >
+                      💾 Guardar empresa
+                    </Button>
+                  </div>
+
+                  {/* Logo upload section */}
+                  <LogoUploader />
                 </div>
               )}
 
               {/* Section 1: Receiver Data */}
               {activeSection === 1 && (
                 <div className="space-y-4">
+                  {/* Selector de clientes guardados */}
+                  {clientsLoaded && (
+                    <ClientSelector
+                      clients={clients}
+                      onSelect={handleSelectClient}
+                      onDelete={deleteClient}
+                      selectedClientId={selectedClientId}
+                    />
+                  )}
+
+                  {clients.length > 0 && (
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-medium text-slate-600 mb-3">O ingresa un nuevo cliente:</p>
+                    </div>
+                  )}
+
                   {formDynamicsReceiver.map((field, index) => (
                     <div key={index}>
                       <FormField
@@ -332,6 +467,17 @@ export const FormComponent = () => {
                       />
                     </div>
                   ))}
+
+                  {/* Botón para guardar cliente */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveCurrentClient}
+                    className="w-full mt-2"
+                    disabled={!watch("nameReceiver") || !watch("receiverId")}
+                  >
+                    💾 Guardar este cliente para uso futuro
+                  </Button>
                 </div>
               )}
 

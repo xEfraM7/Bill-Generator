@@ -110,13 +110,12 @@ export const FormArticleComponent = ({
                   Precio ($)
                 </label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="0.00"
                   value={price}
                   onChange={(e) => updateArticle(id, "price", e.target.value)}
                   className="h-12"
-                  min="0"
-                  step="0.01"
                 />
               </div>
               <div>
@@ -124,14 +123,14 @@ export const FormArticleComponent = ({
                   Cantidad
                 </label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="1"
                   value={quantity}
                   onChange={(e) =>
                     updateArticle(id, "quantity", e.target.value)
                   }
                   className="h-12"
-                  min="1"
                 />
               </div>
             </div>

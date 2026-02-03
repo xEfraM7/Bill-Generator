@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 📄 Bill Generator - Notas de Entrega
 
-## Getting Started
+Aplicación web para generar **Notas de Entrega** profesionales en formato PDF. Creada con Next.js 14, React-PDF y TypeScript.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-14.2.5-black?logo=next.js)
+![React](https://img.shields.io/badge/React-18.3-blue?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?logo=tailwindcss)
+
+---
+
+## ✨ Características
+
+- 📝 **Formulario Multi-Paso** - Navegación intuitiva por secciones
+- ✅ **Validación en Tiempo Real** - Con Zod y react-hook-form
+- 📄 **Generación de PDF** - Documentos profesionales con react-pdf
+- 📱 **Diseño Responsive** - Optimizado para móvil y desktop
+- 💾 **Descarga Automática** - El PDF se guarda directamente
+- 🎨 **UI Moderna** - Componentes shadcn/ui con TailwindCSS
+
+---
+
+## 🚀 Inicio Rápido
+
+### Requisitos
+- Node.js 18+ 
+- npm, yarn, pnpm o bun
+
+### Instalación
 
 ```bash
+# Clonar repositorio
+git clone https://github.com/tu-usuario/Bill-Generator.git
+cd Bill-Generator
+
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tu nombre de empresa
+
+# Iniciar servidor de desarrollo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## ⚙️ Configuración
 
-## Learn More
+### Variables de Entorno
 
-To learn more about Next.js, take a look at the following resources:
+Crea un archivo `.env` en la raíz:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+NEXT_PUBLIC_COMPANY_NAME=Mi Empresa S.A.
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 📁 Estructura del Proyecto
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/                    # App Router (Next.js 14)
+│   ├── page.tsx           # Página principal
+│   └── layout.tsx         # Layout raíz
+│
+├── components/
+│   ├── component/         # Componentes de negocio
+│   │   ├── FormComponent.tsx      # Formulario principal
+│   │   ├── FormArticleComponent.tsx
+│   │   └── FormField.tsx
+│   ├── pdf/
+│   │   └── InVoicePDF.tsx # Template del PDF
+│   └── ui/                # Componentes shadcn/ui
+│
+├── hooks/                 # Custom hooks
+│   ├── useArticles.ts     # CRUD de artículos
+│   └── useDate.ts         # Formateo de fechas
+│
+├── types/
+│   └── FormTypes.ts       # Tipos + esquemas Zod
+│
+└── config/
+    └── senderDefaults.ts  # Config por defecto
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+---
+
+## 🛠️ Scripts
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción |
+| `npm start` | Iniciar producción |
+| `npm run lint` | Ejecutar ESLint |
+
+---
+
+## 📦 Dependencias Principales
+
+| Paquete | Uso |
+|---------|-----|
+| `@react-pdf/renderer` | Generación de PDF |
+| `react-hook-form` | Manejo de formularios |
+| `zod` | Validación de esquemas |
+| `file-saver` | Descarga de archivos |
+| `@radix-ui/*` | Componentes accesibles |
+
+---
+
+## 📋 Flujo de la Aplicación
+
+1. **Empresa** - Ingresa el nombre de tu empresa
+2. **Receptor** - Datos del destinatario (nombre, dirección, etc.)
+3. **Servicio** - Descripción opcional del servicio
+4. **Artículos** - Agrega productos con cantidad y precio
+5. **Generar** - Crea y descarga el PDF automáticamente
+
+---
+
+## 🎨 Personalización
+
+### Colores del PDF
+
+Edita los colores en `src/components/pdf/InVoicePDF.tsx`:
+
+```javascript
+const colors = {
+  primary: "#1a365d",    // Encabezados
+  accent: "#3182ce",     // Acentos
+  // ...
+};
+```
+
+---
+
+## 📄 Licencia
+
+MIT © 2026
+
+---
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crea tu rama (`git checkout -b feature/nueva-funcion`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva función'`)
+4. Push a la rama (`git push origin feature/nueva-funcion`)
+5. Abre un Pull Request
