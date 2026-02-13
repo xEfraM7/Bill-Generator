@@ -146,7 +146,8 @@ export const FormComponent = () => {
 
   const saveFile = async (filename: string, invoiceData: Invoice) => {
     const blob = await pdf(<InVoicePDF {...invoiceData} />).toBlob();
-    saveAs(blob, `${filename}.pdf`);
+    const finalFilename = invoiceData.customFilename || filename;
+    saveAs(blob, `${finalFilename}.pdf`);
   };
 
   const onSubmit = async (data: DataForm) => {
@@ -176,7 +177,9 @@ export const FormComponent = () => {
       addToHistory(invoiceData);
 
       setFormState(invoiceData);
-      saveAs(blob, `${invoiceNumber}.pdf`);
+
+      const finalFilename = data.customFilename || invoiceNumber;
+      saveAs(blob, `${finalFilename}.pdf`);
       setScreenDisplay(true);
       toast.success("¡Nota de entrega generada!");
     } catch (error) {
@@ -207,7 +210,7 @@ export const FormComponent = () => {
         "countryReceiver",
       ],
       2: ["serviceDescription"],
-      3: ["articles"],
+      3: ["articles", "customFilename"],
     };
     return await trigger(fieldsToValidate[sectionId]);
   };
@@ -278,7 +281,7 @@ export const FormComponent = () => {
               </Button>
               <ShareButton
                 pdfBlob={pdfBlob}
-                fileName={`${formState.inVoiceNumber}.pdf`}
+                fileName={`${formState.customFilename || formState.inVoiceNumber}.pdf`}
                 title={`Nota de Entrega #${formState.inVoiceNumber}`}
               />
             </div>
@@ -486,7 +489,7 @@ export const FormComponent = () => {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="serviceDescription" className="text-base">
-                      Descripción del servicio
+                      Descripción del servicio (Opcional)
                     </Label>
                     <Textarea
                       id="serviceDescription"
@@ -529,6 +532,27 @@ export const FormComponent = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label htmlFor="customFilename" className="text-base">
+                      Nombre del archivo (Opcional)
+                    </Label>
+                    <Controller
+                      name="customFilename"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="customFilename"
+                          placeholder="Ej: Nota entrega Cliente X"
+                          className="h-12"
+                        />
+                      )}
+                    />
+                    <p className="text-sm text-slate-500">
+                      Si lo dejas vacío, se usará el número de nota aleatorio.
+                    </p>
+                  </div>
                 </div>
               )}
 

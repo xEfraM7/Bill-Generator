@@ -35,6 +35,7 @@ export type DataForm = {
   cityReceiver: string;
   countryReceiver: string;
   serviceDescription: string;
+  customFilename?: string;
   articles: Article[];
 };
 
@@ -68,6 +69,7 @@ export type ValidFieldNames =
   | "cityReceiver"
   | "countryReceiver"
   | "serviceDescription"
+  | "customFilename"
   | "nameItem"
   | "quantity"
   | "price";
@@ -93,6 +95,7 @@ export const formValidationSchema = z.object({
   cityReceiver: z.string().optional().or(z.literal("")),
   countryReceiver: z.string().optional().or(z.literal("")),
   serviceDescription: z.string().optional().or(z.literal("")),
+  customFilename: z.string().optional().or(z.literal("")),
   articles: z.array(articleSchema).min(1, "Debe agregar al menos un artículo"),
 });
 
